@@ -245,7 +245,13 @@ pub(crate) fn open_with<'a>(
     log::debug!("connecting to {host}:{} ({service:?}, {})", port(server, service), server.security.code());
     let (connect, io) = (patience.connect.min(CONNECT_TIMEOUT), patience.io.min(IO_TIMEOUT));
     let tcp = dial(&host, port(server, service), server.security == Security::None, connect, io)?;
-    let mut stream = if server.security == Security::Tls { secure(tcp, &host, tls)? } else { Stream::over(Io::Plain(tcp)) };
+    let mut stream = match (server.security, tls) {
+        (Security::Tls, Some(config)) => secure(tcp, &host, Some(config))?,
+        // An IMAP or SMTP server: its owner may have chosen to trust its own certificate.
+        (Security::Tls, None) if service != Service::Http => secure_mail(tcp, &host, &server.trusted)?,
+        (Security::Tls, None) => secure(tcp, &host, None)?,
+        _ => Stream::over(Io::Plain(tcp)),
+    };
     stream.patience = patience.command.min(COMMAND_TIMEOUT);
     Ok((stream, host))
 }
@@ -257,10 +263,11 @@ pub(crate) fn open_within<'a>(server: &Server, service: Service, connect: Durati
 }
 
 /// Wrap a connection in TLS after the server agreed to STARTTLS. It goes on as it was set up.
-pub(crate) fn upgrade<'a>(stream: Stream<'a>, host: &str) -> Result<Stream<'a>, NetError> {
+/// `trusted`: the fingerprint of the certificate the owner chose to trust for the server, or empty.
+pub(crate) fn upgrade<'a>(stream: Stream<'a>, host: &str, trusted: &str) -> Result<Stream<'a>, NetError> {
     let Stream { io, cancel, patience, .. } = stream;
     let mut secured = match io {
-        Io::Plain(tcp) => secure(tcp, host, None)?,
+        Io::Plain(tcp) => secure_mail(tcp, host, trusted)?,
         tls @ Io::Tls(_) => Stream::over(tls),
     };
     (secured.cancel, secured.patience) = (cancel, patience);
@@ -370,6 +377,24 @@ fn secure<'a>(mut tcp: TcpStream, host: &str, tls: Option<Arc<ClientConfig>>) ->
     Ok(Stream::over(Io::Tls(Box::new(StreamOwned::new(connection, tcp)))))
 }
 
+/// Shake hands with an IMAP or SMTP server: the system's check, or exactly the certificate whose
+/// SHA-256 fingerprint the owner chose to trust (`trusted`, empty for none). A certificate that
+/// isn't accepted comes back as [`NetError::Certificate`], with what the owner may be shown of it.
+fn secure_mail<'a>(tcp: TcpStream, host: &str, trusted: &str) -> Result<Stream<'a>, NetError> {
+    let pin = match trusted.trim() {
+        "" => None,
+        fingerprint => Some(
+            crate::cert::parse_fingerprint(fingerprint)
+                .ok_or_else(|| NetError::Config("the certificate trusted for the server isn't a SHA-256 fingerprint".into()))?,
+        ),
+    };
+    let (config, verifier) = crate::tls::mail_server_config(pin).map_err(|reason| NetError::Tls { host: host.to_string(), reason })?;
+    match secure(tcp, host, Some(config)) {
+        Err(error @ NetError::Tls { .. }) => Err(verifier.take_problem().map_or(error, |problem| NetError::Certificate(Box::new(problem)))),
+        other => other,
+    }
+}
+
 /// Why a handshake failed, in a few words.
 fn handshake_problem(e: &std::io::Error) -> String {
     match e.kind() {
@@ -389,7 +414,7 @@ mod tests {
     use super::*;
 
     fn server(host: &str, port: u16, security: Security) -> Server {
-        Server { host: host.into(), port, security }
+        Server::new(host, port, security)
     }
 
     #[test]

@@ -4,7 +4,7 @@
 use crate::fake::{Fake, ImapWorld};
 use mailcraft_model::{Account, Security, Server};
 fn account(port: u16, security: Security) -> Account {
-    Account { email: "user@example.org".into(), incoming: Some(Server { host: "127.0.0.1".into(), port, security }), ..Default::default() }
+    Account { email: "user@example.org".into(), incoming: Some(Server::new("127.0.0.1", port, security)), ..Default::default() }
 }
 #[test]
 fn sync_downloads_through_plain_with_and_without_an_initial_response() {
@@ -60,4 +60,56 @@ fn a_missing_password_is_explained_before_connecting() {
     let error = crate::sync::open_imap(&account(peer.port, Security::None), "").unwrap_err();
     assert!(error.to_string().contains("enter a password"));
     assert_eq!(peer.world().connections, 0);
+}
+/// A home server's own certificate (Azurehawke fork): the account check stops at it and says what
+/// the owner is shown; once its fingerprint is trusted for the server, the same check goes through.
+#[test]
+fn a_servers_own_certificate_is_offered_and_once_trusted_accepted() {
+    use crate::tls_test_support::{Authority, trusting};
+    use mailcraft_model::server_certificate::{self, Role};
+    // Its own authority, which nothing trusts, for a name that isn't the address asked.
+    let (config, der) = Authority::new("Home Server").server_for(&["mail.home"], vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth]);
+    let other = Authority::new("Somebody Else");
+    trusting(vec![other.root()], || {
+        let world = || ImapWorld {
+            user: "user@example.org".into(),
+            password: "invented".into(),
+            plain: true,
+            offer_starttls: true,
+            starttls_upgrade: Some({
+                let config = config.clone();
+                std::sync::Arc::new(move |stream| -> Box<dyn crate::fake::MailIo> {
+                    let connection = rustls::ServerConnection::new(config.clone()).unwrap();
+                    Box::new(rustls::StreamOwned::new(connection, stream))
+                })
+            }),
+            ..Default::default()
+        };
+        let peer = Fake::imap(world());
+        let said = crate::test_account(&account(peer.port, Security::StartTls), "invented").unwrap_err().to_string();
+        let offered = server_certificate::read(&said).unwrap();
+        assert_eq!(offered.role, Role::Incoming);
+        assert_eq!(offered.fingerprint, crate::cert::fingerprint(&der));
+        assert!(!offered.changed);
+        assert!(
+            !peer.world().log.iter().any(|s| s.contains(" AUTHENTICATE") || s.contains(" LOGIN ")),
+            "no password before the certificate is trusted"
+        );
+
+        let peer = Fake::imap(world());
+        let mut trusted = account(peer.port, Security::StartTls);
+        if let Some(server) = trusted.incoming.as_mut() {
+            server.trusted = offered.fingerprint.clone();
+        }
+        crate::test_account(&trusted, "invented").unwrap();
+
+        // Another certificate trusted: refused, and said to have changed.
+        let peer = Fake::imap(world());
+        if let Some(server) = trusted.incoming.as_mut() {
+            server.trusted = "ab".repeat(32);
+        }
+        let said = crate::test_account(&trusted, "invented").unwrap_err().to_string();
+        assert!(server_certificate::read(&said).unwrap().changed);
+        drop(peer);
+    });
 }

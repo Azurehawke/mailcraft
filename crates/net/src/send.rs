@@ -100,7 +100,7 @@ pub(crate) fn open_smtp_with<'a>(
             return Err(NetError::Tls { host, reason: "the server doesn't offer STARTTLS".into() });
         }
         let plain = smtp.starttls()?;
-        smtp = Smtp::resume(transport::upgrade(plain, &host)?);
+        smtp = Smtp::resume(transport::upgrade(plain, &host, &server.trusted)?);
         offered = smtp.hello(CLIENT_NAME)?;
     }
     if account.oauth.is_some() {

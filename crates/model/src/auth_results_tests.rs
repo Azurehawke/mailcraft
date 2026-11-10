@@ -19,7 +19,7 @@ fn microsoft_imap() -> Account {
     Account {
         kind: AccountKind::Imap,
         email: "ada@lumen.example".into(),
-        incoming: Some(Server { host: "outlook.office365.com".into(), port: 993, security: Security::Tls }),
+        incoming: Some(Server { host: "outlook.office365.com".into(), port: 993, security: Security::Tls, trusted: String::new() }),
         ..Account::default()
     }
 }

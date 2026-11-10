@@ -222,14 +222,37 @@ mod native {
             return Err(NetError::Config("the account has no mail servers to check".into()));
         }
         if account.incoming.is_some() {
-            let imap = crate::sync::open_imap(account, secret).map_err(|e| e.without(secret))?;
+            let imap = crate::sync::open_imap(account, secret).map_err(|e| offered(e.without(secret), Role::Incoming))?;
             let _ = imap.logout();
         }
         if account.outgoing.is_some() {
-            let smtp = crate::send::open_smtp(account, secret).map_err(|e| e.without(secret))?;
+            let smtp = crate::send::open_smtp(account, secret).map_err(|e| offered(e.without(secret), Role::Outgoing))?;
             let _ = smtp.quit();
         }
         Ok(())
+    }
+
+    use mailcraft_model::server_certificate::{self, Role, UntrustedCertificate};
+
+    /// A certificate the owner may choose to trust for one of the account's servers, written
+    /// after the error's sentence for Add Account to offer (`server_certificate`); any other
+    /// error as it is.
+    fn offered(error: NetError, role: Role) -> NetError {
+        let NetError::Certificate(problem) = &error else { return error };
+        if !problem.can_be_trusted() {
+            return error;
+        }
+        let info = problem.info();
+        let certificate = UntrustedCertificate {
+            role,
+            fingerprint: info.fingerprint.clone(),
+            subject: info.subject.clone(),
+            issuer: info.issuer.clone(),
+            not_before: info.not_before,
+            not_after: info.not_after,
+            changed: matches!(**problem, CertificateProblem::Changed(_)),
+        };
+        NetError::Config(server_certificate::note(&problem.to_string(), &certificate))
     }
 }
 

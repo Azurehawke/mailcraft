@@ -8,7 +8,7 @@ version = "0.11.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.95"
-repository = "https://github.com/UCS-Care-Group/mailcraft"
+repository = "https://github.com/Azurehawke/mailcraft"
 
 [workspace.dependencies]
 # internal

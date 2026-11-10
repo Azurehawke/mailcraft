@@ -51,7 +51,7 @@ const REFUSED: &[&str] = &[
 ];
 
 fn account(provider: OAuthProvider, host: &str) -> Account {
-    let server = Server { host: host.into(), port: 993, security: Security::Tls };
+    let server = Server { host: host.into(), port: 993, security: Security::Tls, trusted: String::new() };
     Account {
         id: 1,
         kind: AccountKind::Imap,

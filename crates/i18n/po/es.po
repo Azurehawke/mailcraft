@@ -1682,7 +1682,7 @@ msgid "Available formats:"
 msgstr ""
 
 #. command label, interface, ribbon
-#: crates/engine/src/cmd/view.rs crates/ui-egui/src/account_setup.rs crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/backstage.rs crates/ui-egui/src/ribbon.rs
+#: crates/engine/src/cmd/view.rs crates/ui-egui/src/account_setup.rs crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/account_setup/server_cert.rs crates/ui-egui/src/backstage.rs crates/ui-egui/src/ribbon.rs
 #, fuzzy
 msgid "Back"
 msgstr "Atrás"
@@ -2592,7 +2592,7 @@ msgid "Contacts don't go to Deleted Items."
 msgstr "Los contactos no van a Elementos eliminados."
 
 #. interface
-#: crates/ui-egui/src/account_setup.rs crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/auto_replies.rs crates/ui-egui/src/open_shared.rs crates/ui-egui/src/opening.rs crates/ui-egui/src/rule_sync.rs crates/ui-egui/src/shared_calendars.rs crates/ui-egui/src/shared_mailboxes.rs crates/ui-egui/src/task_sync.rs
+#: crates/ui-egui/src/account_setup.rs crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/account_setup/server_cert.rs crates/ui-egui/src/auto_replies.rs crates/ui-egui/src/open_shared.rs crates/ui-egui/src/opening.rs crates/ui-egui/src/rule_sync.rs crates/ui-egui/src/shared_calendars.rs crates/ui-egui/src/shared_mailboxes.rs crates/ui-egui/src/task_sync.rs
 #, fuzzy
 msgid "Continue"
 msgstr "Continuar"
@@ -4235,7 +4235,7 @@ msgid "For an account that signs in with Microsoft: the folders you keep under F
 msgstr "Para una cuenta que inicia sesión con Microsoft: las carpetas que tiene en Favoritos en Outlook, en el mismo orden. Se leen del servidor y nunca se cambian allí. Sin esto, se muestran los favoritos que marque en MailCraft."
 
 #. interface
-#: crates/ui-egui/src/ews_setup.rs
+#: crates/ui-egui/src/account_setup/server_cert.rs crates/ui-egui/src/ews_setup.rs
 msgid "Forget"
 msgstr ""
 
@@ -5283,7 +5283,7 @@ msgid "Invite attendees"
 msgstr "Invitar a asistentes"
 
 #. interface
-#: crates/ui-egui/src/account_setup/exchange.rs
+#: crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/account_setup/server_cert.rs
 msgid "Issued by"
 msgstr ""
 
@@ -5293,7 +5293,7 @@ msgid "Issued by:"
 msgstr ""
 
 #. interface
-#: crates/ui-egui/src/account_setup/exchange.rs
+#: crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/account_setup/server_cert.rs
 msgid "Issued to"
 msgstr ""
 
@@ -7860,6 +7860,11 @@ msgid "Only this certificate is trusted, and only for this account. If the serve
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/account_setup/server_cert.rs
+msgid "Only this certificate is trusted, and only for this server. If the server shows another one later, it is refused until you trust that one."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/backstage.rs
 #, fuzzy
 msgid "Only when I ask"
@@ -9491,7 +9496,7 @@ msgid "Run this rule on mail as it arrives"
 msgstr "Ejecutar esta regla sobre el correo a medida que llega"
 
 #. interface
-#: crates/ui-egui/src/account_setup/exchange.rs
+#: crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/account_setup/server_cert.rs
 msgid "SHA-256 fingerprint"
 msgstr ""
 
@@ -11144,6 +11149,11 @@ msgstr "Detener este envío y recepción; lo que ya ha llegado se queda"
 msgid "Stop trusting this certificate for this account. If the server shows it again and this computer doesn't trust it, you are asked."
 msgstr ""
 
+#. interface
+#: crates/ui-egui/src/account_setup/server_cert.rs
+msgid "Stop trusting this certificate: the system alone decides again"
+msgstr ""
+
 #. interface, what a command says
 #: crates/engine/src/cmd/account.rs crates/ui-egui/src/sync_panel.rs
 #, fuzzy
@@ -11805,6 +11815,11 @@ msgid "The certificate the server at {host} shows is not the one you trusted for
 msgstr ""
 
 #. interface
+#: crates/ui-egui/src/account_setup/server_cert.rs
+msgid "The certificate the {which} server at {host} shows is not the one you trusted for it, and this computer doesn't trust it. Trust it only if you replaced the server's certificate yourself."
+msgstr ""
+
+#. interface
 #: crates/ui-egui/src/reading/signature.rs
 msgid "The certificate wasn't issued by a certification authority this computer trusts."
 msgstr ""
@@ -12256,7 +12271,7 @@ msgid "The server's certificate"
 msgstr ""
 
 #. interface
-#: crates/ui-egui/src/account_setup/exchange.rs
+#: crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/account_setup/server_cert.rs
 msgid "The server's certificate has changed"
 msgstr ""
 
@@ -12774,6 +12789,11 @@ msgstr "Este calendario todavía no está conectado a su cuenta. Lo que cambie e
 #. interface
 #: crates/ui-egui/src/account_setup/exchange.rs
 msgid "This computer doesn't trust the certificate the server at {host} shows. If this is your organisation's server, you can trust this one certificate for this account."
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/account_setup/server_cert.rs
+msgid "This computer doesn't trust the certificate the {which} server at {host} shows. If this is your own server with a certificate it issued itself, compare the fingerprint below with the one on the server, then trust this one certificate."
 msgstr ""
 
 #. interface
@@ -13539,13 +13559,23 @@ msgid "Trust this certificate for this account"
 msgstr ""
 
 #. interface
-#: crates/ui-egui/src/account_setup/exchange.rs
+#: crates/ui-egui/src/account_setup/server_cert.rs
+msgid "Trust this certificate for this server"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/account_setup/server_cert.rs
 msgid "Trust this server's certificate?"
 msgstr ""
 
 #. interface
 #: crates/ui-egui/src/ews_setup.rs
 msgid "Trusted certificate (SHA-256 fingerprint):"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/account_setup/server_cert.rs
+msgid "Trusts the certificate {fingerprint}…"
 msgstr ""
 
 #. command label
@@ -13855,7 +13885,7 @@ msgid "Usually the whole address"
 msgstr "Normalmente, la dirección completa"
 
 #. interface
-#: crates/ui-egui/src/account_setup/exchange.rs
+#: crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/account_setup/server_cert.rs
 msgid "Valid"
 msgstr ""
 
@@ -15032,7 +15062,7 @@ msgid "folders are nested too deeply"
 msgstr "las carpetas están anidadas a demasiada profundidad"
 
 #. interface
-#: crates/ui-egui/src/account_setup/exchange.rs
+#: crates/ui-egui/src/account_setup/exchange.rs crates/ui-egui/src/account_setup/server_cert.rs
 msgid "from {from} to {to}"
 msgstr ""
 
@@ -15069,6 +15099,11 @@ msgstr ""
 #, fuzzy
 msgid "in {time}"
 msgstr "dentro de {time}"
+
+#. interface
+#: crates/ui-egui/src/account_setup/server_cert.rs
+msgid "incoming mail (IMAP)"
+msgstr ""
 
 #. why a command can't run
 #: crates/engine/src/cmd/calendar/invitation.rs
@@ -15608,6 +15643,11 @@ msgstr "organizer"
 #. why a command can't run
 #: crates/engine/src/cmd/calendar_opened.rs
 msgid "other people's calendars open under a Microsoft work or school account"
+msgstr ""
+
+#. interface
+#: crates/ui-egui/src/account_setup/server_cert.rs
+msgid "outgoing mail (SMTP)"
 msgstr ""
 
 #. what a command says

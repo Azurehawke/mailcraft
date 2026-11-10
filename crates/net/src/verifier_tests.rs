@@ -15,7 +15,7 @@ use crate::tls_test_support::{Authority, trusting};
 fn account(port: u16) -> Account {
     Account {
         email: "user@example.org".into(),
-        incoming: Some(Server { host: "127.0.0.1".into(), port, security: Security::StartTls }),
+        incoming: Some(Server { host: "127.0.0.1".into(), port, security: Security::StartTls, trusted: String::new() }),
         ..Default::default()
     }
 }
@@ -35,12 +35,14 @@ fn imap(server: Arc<ServerConfig>) -> Fake<ImapWorld> {
 }
 
 /// Why the connection to the fake was refused, which must be its certificate; no password went.
+/// (Azurehawke fork: an IMAP server's certificate that isn't trusted is offered to its owner, so
+/// the refusal comes with what they are shown, and the system's own words are not in it.)
 fn refused(peer: &Fake<ImapWorld>) -> String {
     let Err(error) = crate::sync::open_imap(&account(peer.port), "invented") else { panic!("the connection was allowed") };
-    let NetError::Tls { host, reason } = error else { panic!("refused, but not by the certificate check: {error}") };
-    assert_eq!(host, "127.0.0.1");
+    let NetError::Certificate(problem) = &error else { panic!("refused, but not by the certificate check: {error}") };
+    assert!(matches!(**problem, crate::cert::CertificateProblem::NotTrusted(_)), "{error}");
     assert!(!peer.world().log.iter().any(|s| s.contains("AUTHENTICATE") || s.contains(" LOGIN ")));
-    reason
+    error.to_string()
 }
 
 #[test]
@@ -61,10 +63,6 @@ fn a_certificate_from_an_authority_nobody_trusts_is_refused() {
     let peer = imap(stranger.server(&["localhost", "127.0.0.1"]));
     let reason = trusting(vec![trusted.root()], || refused(&peer));
     assert!(reason.contains("certificate"), "{reason}");
-    // Where the check is webpki over the system's store, the reason is exactly that the issuer is
-    // unknown; picture downloads put that in plain words (`pictures::handshake_trouble`).
-    #[cfg(all(unix, not(target_vendor = "apple")))]
-    assert!(reason.contains("UnknownIssuer"), "{reason}");
 }
 
 #[test]
@@ -81,8 +79,8 @@ fn a_certificate_for_another_name_is_refused() {
     let authority = Authority::new("MailCraft Test Authority");
     let peer = imap(authority.server(&["mail.example.org"]));
     let reason = trusting(vec![authority.root()], || refused(&peer));
-    // webpki names the name it was given; the Windows and macOS verifiers only say it doesn't match.
-    assert!(reason.contains("not valid for name") || reason.contains("NotValidForName"), "{reason}");
+    // Refused all the same: only a certificate the owner chose by its fingerprint goes through.
+    assert!(reason.contains("certificate"), "{reason}");
 }
 
 #[test]

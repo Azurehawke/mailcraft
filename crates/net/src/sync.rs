@@ -484,7 +484,7 @@ pub(crate) fn open_imap_with<'a>(
             return Err(NetError::Tls { host, reason: "the server doesn't offer STARTTLS".into() });
         }
         let plain = imap.starttls()?;
-        imap = Imap::resume(transport::upgrade(plain, &host)?);
+        imap = Imap::resume(transport::upgrade(plain, &host, &server.trusted)?);
     }
     if imap.is_authenticated() {
         return Ok(imap);
@@ -1276,7 +1276,7 @@ mod tests {
     #[test]
     fn what_a_servers_name_says_of_it() {
         let named = |host: &str| {
-            let incoming = Some(mailcraft_model::Server { host: host.into(), port: 993, security: Security::Tls });
+            let incoming = Some(mailcraft_model::Server { host: host.into(), port: 993, security: Security::Tls, trusted: String::new() });
             Host::of(&Account { incoming, ..Default::default() })
         };
         // Microsoft's and Google's keep what is sent through them; Microsoft's are Exchange.

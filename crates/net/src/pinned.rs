@@ -80,6 +80,11 @@ pub(crate) struct Pinned {
     pin: Option<[u8; 32]>,
     /// Why the last certificate was not accepted.
     noted: Mutex<Option<CertificateProblem>>,
+    /// For an IMAP or SMTP server (Azurehawke fork): the owner decides on the certificate itself,
+    /// so one the system refuses for any reason (a self-issued certificate, one for an IP address
+    /// it doesn't name, one past its dates) is offered, and exactly the certificate whose
+    /// fingerprint the owner chose is accepted. Every other certificate is still refused.
+    owner_decides: bool,
 }
 
 impl fmt::Debug for Pinned {
@@ -90,7 +95,13 @@ impl fmt::Debug for Pinned {
 
 impl Pinned {
     pub(crate) fn new(system: Arc<dyn ServerCertVerifier>, pin: Option<[u8; 32]>) -> Self {
-        Self { system, pin, noted: Mutex::new(None) }
+        Self { system, pin, noted: Mutex::new(None), owner_decides: false }
+    }
+
+    /// The verifier for an IMAP or SMTP server, whose owner decides on its certificate
+    /// ([`Pinned::owner_decides`]).
+    pub(crate) fn for_mail_server(system: Arc<dyn ServerCertVerifier>, pin: Option<[u8; 32]>) -> Self {
+        Self { owner_decides: true, ..Self::new(system, pin) }
     }
 
     /// What the verifier noted of the certificate it refused, if it did; read once.
@@ -111,6 +122,22 @@ impl Pinned {
         now: UnixTime,
     ) -> Result<ServerCertVerified, Error> {
         let Some(info) = cert::describe(end_entity.as_ref()) else { return Err(error) };
+        if self.owner_decides {
+            // The exact certificate the owner chose (all 32 bytes of its SHA-256): that is the
+            // server's identity, whatever its name, issuer or dates say. The handshake still
+            // proves the server holds its private key.
+            return match self.pin {
+                Some(pin) if pin == cert::sha256(end_entity.as_ref()) => Ok(ServerCertVerified::assertion()),
+                Some(_) => {
+                    self.note(CertificateProblem::Changed(info));
+                    Err(error)
+                }
+                None => {
+                    self.note(CertificateProblem::NotTrusted(info));
+                    Err(error)
+                }
+            };
+        }
         // What the system itself says is wrong with the dates or the name is believed.
         let fault = match &error {
             Error::InvalidCertificate(CertificateError::Expired | CertificateError::ExpiredContext { .. }) => Some(CertificateFault::Expired),

@@ -842,7 +842,7 @@ mod tests {
         assert_eq!(said(&app), Some(format!("MailCraft {} is available", newer())));
         assert_eq!(app.ui.update_told, newer());
         assert_eq!(app.ui.update_checked, NOW);
-        assert_eq!(app.newer_release().unwrap().page, format!("https://github.com/UCS-Care-Group/mailcraft/releases/tag/v{}", newer()));
+        assert_eq!(app.newer_release().unwrap().page, format!("https://github.com/Azurehawke/mailcraft/releases/tag/v{}", newer()));
         saved = app.prefs();
 
         // Within the day: nobody is asked.

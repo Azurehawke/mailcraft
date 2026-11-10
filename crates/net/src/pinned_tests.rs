@@ -205,3 +205,38 @@ fn the_systems_look_is_marked_only_for_the_pinned_certificate_and_only_while_it_
         assert!(!pin_check_under_way(), "cleared when the look is over");
     }
 }
+
+/// An IMAP or SMTP server (Azurehawke fork): exactly the pinned certificate is accepted, whatever
+/// the system said and whatever its name or dates; any other is offered, never accepted.
+#[test]
+fn a_mail_servers_owner_decides_on_the_certificate_itself() {
+    // A home server's own certificate, for a name that isn't the IP address asked, and past its dates.
+    let der = CertificateDer::from(make(&["mail.home"], "mail.home", None, (2020, 1, 1), (2021, 1, 1)));
+    let ip = ServerName::try_from("100.107.227.53".to_owned()).unwrap();
+    let errors = [
+        Error::InvalidCertificate(CertificateError::UnknownIssuer),
+        Error::InvalidCertificate(CertificateError::Expired),
+        Error::InvalidCertificate(CertificateError::NotValidForName),
+        other("0x800B0109"),
+    ];
+    let trusting = Pinned::for_mail_server(Arc::new(Refuses), Some(cert::sha256(der.as_ref())));
+    for error in errors.clone() {
+        assert!(trusting.refused(error, &der, &ip, now()).is_ok());
+        assert_eq!(trusting.take_problem(), None);
+    }
+    // Not pinned: refused, and offered with what the owner is shown.
+    let asking = Pinned::for_mail_server(Arc::new(Refuses), None);
+    for error in errors.clone() {
+        assert!(asking.refused(error, &der, &ip, now()).is_err());
+        let problem = asking.take_problem().unwrap();
+        assert!(matches!(problem, CertificateProblem::NotTrusted(_)) && problem.can_be_trusted());
+        assert_eq!(problem.info().fingerprint, cert::fingerprint(der.as_ref()));
+    }
+    // Another certificate pinned: refused, and said to have changed.
+    let changed = Pinned::for_mail_server(Arc::new(Refuses), Some([7; 32]));
+    assert!(changed.refused(errors[0].clone(), &der, &ip, now()).is_err());
+    assert!(matches!(changed.take_problem(), Some(CertificateProblem::Changed(_))));
+    // The whole check, through the system's look first.
+    assert!(trusting.verify_server_cert(&der, &[], &ip, &[], now()).is_ok());
+    assert!(asking.verify_server_cert(&der, &[], &ip, &[], now()).is_err());
+}

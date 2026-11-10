@@ -52,7 +52,7 @@ fn the_address_carries_what_was_typed_and_the_version_and_nothing_else() {
     let p = json!({"title": "Search stops", "what": "I searched & it stopped", "expected": "Results", "diagnostics": true, "open": false});
     let r = report(&mut a, p).unwrap();
     let url = r["url"].as_str().unwrap();
-    assert!(url.starts_with("https://github.com/UCS-Care-Group/mailcraft/issues/new?template=problem.yml&title=Search%20stops&"), "{url}");
+    assert!(url.starts_with("https://github.com/Azurehawke/mailcraft/issues/new?template=problem.yml&title=Search%20stops&"), "{url}");
     assert!(url.contains("&version=9.8.7&platform=testos%20testarch&what=I%20searched%20%26%20it%20stopped"), "{url}");
     assert!(url.contains("What%20I%20expected") && url.contains("&diagnostics=Drag%20the%20diagnostics%20file"), "{url}");
     assert_eq!(r["length"].as_u64().unwrap() as usize, url.len());

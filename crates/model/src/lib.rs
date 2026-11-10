@@ -40,6 +40,7 @@ pub mod rich;
 mod rule;
 pub mod search;
 pub mod sender_warnings;
+pub mod server_certificate;
 pub mod shown;
 pub mod signature;
 pub mod sync;

@@ -80,6 +80,16 @@ pub(crate) fn pinned_config(pin: Option<[u8; 32]>) -> Result<(Arc<ClientConfig>,
     Ok((config, verifier))
 }
 
+/// The TLS settings for an IMAP or SMTP server: the system's check, and the one certificate the
+/// owner chose to trust by its fingerprint (`pin`) when the system doesn't trust it, whatever
+/// else is wrong with it ([`crate::pinned::Pinned::for_mail_server`]). Built for each connection.
+pub(crate) fn mail_server_config(pin: Option<[u8; 32]>) -> Result<(Arc<ClientConfig>, Arc<crate::pinned::Pinned>), String> {
+    let provider = provider();
+    let verifier = Arc::new(crate::pinned::Pinned::for_mail_server(system_verifier(&provider)?, pin));
+    let config = build(provider, verifier.clone(), Purpose::Mail)?;
+    Ok((config, verifier))
+}
+
 fn provider() -> Arc<CryptoProvider> {
     Arc::new(rustls::crypto::ring::default_provider())
 }

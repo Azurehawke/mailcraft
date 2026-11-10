@@ -258,6 +258,19 @@ pub struct Server {
     pub host: String,
     pub port: u16,
     pub security: Security,
+    /// The SHA-256 fingerprint (64 hexadecimal digits) of the one certificate the owner chose to
+    /// trust for this server although the system doesn't (a server's own, self-issued
+    /// certificate); empty when none is. Never an "ignore errors" switch: any other certificate
+    /// is judged by the system alone, and one that isn't this one is refused.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub trusted: String,
+}
+
+impl Server {
+    /// A server at `host` and `port` with `security`, trusting only what the system trusts.
+    pub fn new(host: impl Into<String>, port: u16, security: Security) -> Server {
+        Server { host: host.into(), port, security, trusted: String::new() }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
