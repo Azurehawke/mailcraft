@@ -102,12 +102,16 @@ fn init_tls() -> Result<(), String> {
     let context = ndk_context::android_context();
     // SAFETY: the VM and the activity belong to this process, and Android keeps both for as long
     // as the app runs. Attaching the thread that calls in is what the JNI requires of it.
+    if context.vm().is_null() || context.context().is_null() {
+        return Err("Android hasn't given the app its activity yet".into());
+    }
+    // (`from_raw` asserts a non-null pointer, which the check above rules out.)
     #[allow(unsafe_code)]
-    let vm = unsafe { jni::JavaVM::from_raw(context.vm().cast()) }.map_err(|e| e.to_string())?;
+    let vm = unsafe { jni::JavaVM::from_raw(context.vm().cast()) };
     vm.attach_current_thread(|env| {
         // SAFETY: as above; the activity is a local reference for this call only.
         #[allow(unsafe_code)]
-        let activity = unsafe { jni::objects::JObject::from_raw(context.context().cast()) };
+        let activity = unsafe { jni::objects::JObject::from_raw(env, context.context().cast()) };
         rustls_platform_verifier::android::init_with_env(env, activity)
     })
     .map_err(|e| e.to_string())
