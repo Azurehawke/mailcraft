@@ -179,7 +179,19 @@ impl eframe::App for MobileApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        self.app.ui(ui);
+        // The window's whole layout goes inside the area the system bars leave free. egui's own
+        // safe area isn't relied on: Android 16 draws under the bars and the root layout ignores it.
+        let i = self.insets;
+        let mut rect = ui.max_rect();
+        rect.min.x += i.left;
+        rect.min.y += i.top;
+        rect.max.x -= i.right;
+        rect.max.y -= i.bottom;
+        if rect.is_positive() {
+            ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| self.app.ui(ui));
+        } else {
+            self.app.ui(ui);
+        }
     }
 
     fn on_exit(&mut self) {
