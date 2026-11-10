@@ -67,6 +67,7 @@ pub const TABLE: &[(&str, Class)] = &[
     ("mailcraft", Class::Exempt),
     ("cli", Class::Exempt),
     ("web", Class::Exempt),
+    ("android", Class::Exempt),
     ("xtask", Class::Exempt),
 ];
 

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MailCraft for Android: a NativeActivity that loads libmailcraft_android.so
+     (apps/mailcraft-android). There is no Java: hasCode is false. Built by build-apk.sh. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.azurehawke.mailcraft">
+
+    <!-- Mail, its sign-ins and the server's certificates: the connections the app makes itself. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <application
+        android:label="MailCraft"
+        android:icon="@mipmap/ic_launcher"
+        android:hasCode="false"
+        android:extractNativeLibs="true"
+        android:resizeableActivity="true"
+        android:appCategory="productivity">
+
+        <!-- configChanges: rotating, attaching a keyboard or resizing in split screen must not
+             recreate the activity (that would restart the app and its event loop). -->
+        <activity
+            android:name="android.app.NativeActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Material.NoActionBar"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode|fontScale|locale|layoutDirection">
+            <meta-data android:name="android.app.lib_name" android:value="mailcraft_android" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
