@@ -99,32 +99,67 @@ fn sync_in_background(request: SyncRequest, ctx: egui::Context) -> Receiver<Sync
 struct MobileApp {
     app: MailApp,
     android: AndroidApp,
+    /// The status bar's height in physical pixels, as Android lays it out (0 if not known).
+    status_bar_px: i32,
     /// The system bars' insets last applied, in points.
     insets: egui::epaint::MarginF32,
 }
 
+/// The status bar's height in physical pixels, asked of Android's own resources (the
+/// `status_bar_height` dimension). Android 16 on One UI draws the app under the bar, and the
+/// content rect doesn't shrink, so the height is the one thing that says where the bar ends.
+#[allow(unsafe_code)] // The JavaVM and activity pointers android-activity gives, valid while the app runs.
+fn status_bar_height_px(android: &AndroidApp) -> i32 {
+    let vm_ptr = android.vm_as_ptr() as *mut jni::sys::JavaVM;
+    let activity_ptr = android.activity_as_ptr() as jni::sys::jobject;
+    if vm_ptr.is_null() || activity_ptr.is_null() {
+        return 0;
+    }
+    // SAFETY: both pointers come from android-activity and stay valid for as long as the app runs.
+    let vm = unsafe { jni::JavaVM::from_raw(vm_ptr) };
+    vm.attach_current_thread(|env| -> jni::errors::Result<i32> {
+        // SAFETY: the activity is a live local reference for this call, on this thread.
+        let activity = unsafe { jni::objects::JObject::from_raw(env, activity_ptr) };
+        let resources = env.call_method(&activity, jni::jni_str!("getResources"), jni::jni_sig!(() -> android.content.res.Resources), &[])?.l()?;
+        let name = env.new_string("status_bar_height")?;
+        let kind = env.new_string("dimen")?;
+        let package = env.new_string("android")?;
+        let id = env
+            .call_method(
+                &resources,
+                jni::jni_str!("getIdentifier"),
+                jni::jni_sig!((java.lang.String, java.lang.String, java.lang.String) -> int),
+                &[jni::objects::JValue::Object(&name), jni::objects::JValue::Object(&kind), jni::objects::JValue::Object(&package)],
+            )?
+            .i()?;
+        if id == 0 {
+            return Ok(0);
+        }
+        env.call_method(&resources, jni::jni_str!("getDimensionPixelSize"), jni::jni_sig!((int) -> int), &[jni::objects::JValue::Int(id)])?.i()
+    })
+    .unwrap_or(0)
+    .max(0)
+}
+
 impl MobileApp {
-    /// The window's edges covered by system bars, in points, from Android's content rect (the
-    /// part of the window the bars leave free). NativeActivity draws under the status bar on
-    /// Android 16 (One UI 8.5 forces edge-to-edge), so the window is laid out inside this area.
+    /// The window's edges covered by system bars, in points. The sides come from Android's
+    /// content rect (the part of the window the bars leave free). The top is at least the status
+    /// bar's height, since the content rect can still start at the top of the screen.
     fn system_bar_insets(&self, ctx: &egui::Context, raw: &egui::RawInput) -> Option<egui::epaint::MarginF32> {
         let ppp = ctx.pixels_per_point();
         let screen = raw.screen_rect?;
         if !(ppp.is_finite() && ppp > 0.0) {
             return None;
         }
-        let r = self.android.content_rect();
-        if r.right <= r.left || r.bottom <= r.top {
-            return None;
-        }
         let (w, h) = (screen.width() * ppp, screen.height() * ppp);
         let inset = |px: f32| (px / ppp).clamp(0.0, 400.0);
-        Some(egui::epaint::MarginF32 {
-            left: inset(r.left as f32),
-            top: inset(r.top as f32),
-            right: inset(w - r.right as f32),
-            bottom: inset(h - r.bottom as f32),
-        })
+        let r = self.android.content_rect();
+        let (left, top, right, bottom) = if r.right > r.left && r.bottom > r.top {
+            (inset(r.left as f32), inset(r.top as f32), inset(w - r.right as f32), inset(h - r.bottom as f32))
+        } else {
+            (0.0, 0.0, 0.0, 0.0)
+        };
+        Some(egui::epaint::MarginF32 { left, top: top.max(inset(self.status_bar_px as f32)), right, bottom })
     }
 }
 
@@ -207,7 +242,9 @@ fn android_main(android: AndroidApp) {
             }
             let mut app = MailApp::new(session, services);
             app.autosave = path.is_some();
-            Ok(Box::new(MobileApp { app, android: for_insets, insets: egui::epaint::MarginF32::default() }))
+            let status_bar_px = status_bar_height_px(&for_insets);
+            log::info!("status bar height (pixels): {status_bar_px}");
+            Ok(Box::new(MobileApp { app, android: for_insets, status_bar_px, insets: egui::epaint::MarginF32::default() }))
         }),
     );
     if let Err(e) = result {

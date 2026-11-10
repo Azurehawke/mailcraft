@@ -35,3 +35,5 @@ egui = { workspace = true }
 winit = { version = "0.30", default-features = false, features = ["android-native-activity"] }
 log = { workspace = true }
 android_logger = "0.15"
+# The status bar's height, asked of Android's own resources (the same jni that android-activity uses).
+jni = "0.22"
