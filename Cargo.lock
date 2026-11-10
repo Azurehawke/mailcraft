@@ -3153,15 +3153,12 @@ dependencies = [
  "android_logger",
  "eframe",
  "egui",
- "jni",
  "log",
  "mailcraft-control-key",
  "mailcraft-engine",
  "mailcraft-model",
  "mailcraft-net",
  "mailcraft-ui-egui",
- "ndk-context",
- "rustls-platform-verifier",
  "winit",
 ]
 
@@ -3372,6 +3369,7 @@ dependencies = [
  "schannel",
  "serde_json",
  "thiserror 2.0.21",
+ "webpki-root-certs",
 ]
 
 [[package]]

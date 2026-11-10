@@ -46,3 +46,8 @@ stand-in = []
 proptest = { workspace = true }
 # Runtime-generated certificates for the loopback STARTTLS fake only.
 rcgen = { workspace = true }
+
+# Android's public roots for the certificate check (`tls::platform_verifier`): the same list
+# rustls-platform-verifier already brings for Android (CDLA-Permissive-2.0; see deny.toml).
+[target.'cfg(target_os = "android")'.dependencies]
+webpki-root-certs = "1"

@@ -17,7 +17,32 @@ use std::sync::{Arc, OnceLock};
 use rustls::ClientConfig;
 use rustls::client::danger::ServerCertVerifier;
 use rustls::crypto::CryptoProvider;
+#[cfg(not(target_os = "android"))]
 use rustls_platform_verifier::Verifier;
+
+/// The verifier for a connection: the operating system's own everywhere but Android. On Android
+/// it is Mozilla's public roots, bundled in the app (`webpki-root-certs`) and checked by rustls.
+/// Android's verifier needs a JNI set-up that the app can't rely on, and it refused the chains
+/// Let's Encrypt issues now (through Root YE, which older Android stores lack), which these roots
+/// accept. The system's own trusted authorities are not consulted on Android.
+#[cfg(target_os = "android")]
+fn platform_verifier(provider: Arc<CryptoProvider>) -> Result<Arc<dyn ServerCertVerifier>, String> {
+    use rustls::RootCertStore;
+    use rustls::client::WebPkiServerVerifier;
+    let mut roots = RootCertStore::empty();
+    roots.extend(webpki_root_certs::TLS_SERVER_ROOT_CERTS.iter().cloned());
+    let verifier: Arc<dyn ServerCertVerifier> = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider)
+        .build()
+        .map_err(|e| format!("the certificate check couldn't be set up ({e})"))?;
+    Ok(verifier)
+}
+
+#[cfg(not(target_os = "android"))]
+fn platform_verifier(provider: Arc<CryptoProvider>) -> Result<Arc<dyn ServerCertVerifier>, String> {
+    let verifier: Arc<dyn ServerCertVerifier> =
+        Arc::new(Verifier::new(provider).map_err(|e| format!("the system's certificate check couldn't be set up ({e})"))?);
+    Ok(verifier)
+}
 
 /// Who a connection is for: the settings differ only in what is said during the handshake.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,8 +73,8 @@ pub(crate) fn client_config(purpose: Purpose) -> Result<Arc<ClientConfig>, Strin
     }
     // Not kept when it fails: a certificate store installed meanwhile is found next time.
     let provider = provider();
-    let verifier = Verifier::new(provider.clone()).map_err(|e| format!("the system's certificate check couldn't be set up ({e})"))?;
-    let config = build(provider, Arc::new(verifier), purpose)?;
+    let verifier = platform_verifier(provider.clone())?;
+    let config = build(provider, verifier, purpose)?;
     Ok(cache.get_or_init(|| config).clone())
 }
 
@@ -60,12 +85,12 @@ fn system_verifier(provider: &Arc<CryptoProvider>) -> Result<Arc<dyn ServerCertV
         let verifier = Verifier::new_with_extra_roots(roots, provider.clone()).map_err(|e| e.to_string())?;
         return Ok(Arc::new(verifier));
     }
-    static SYSTEM: OnceLock<Arc<Verifier>> = OnceLock::new();
+    static SYSTEM: OnceLock<Arc<dyn ServerCertVerifier>> = OnceLock::new();
     if let Some(verifier) = SYSTEM.get() {
         return Ok(verifier.clone());
     }
-    let verifier = Verifier::new(provider.clone()).map_err(|e| format!("the system's certificate check couldn't be set up ({e})"))?;
-    Ok(SYSTEM.get_or_init(|| Arc::new(verifier)).clone())
+    let verifier = platform_verifier(provider.clone())?;
+    Ok(SYSTEM.get_or_init(|| verifier).clone())
 }
 
 /// The TLS settings for a server whose owner may have chosen to trust one certificate by its

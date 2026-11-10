@@ -35,9 +35,3 @@ egui = { workspace = true }
 winit = { version = "0.30", default-features = false, features = ["android-native-activity"] }
 log = { workspace = true }
 android_logger = "0.15"
-# The JNI, at the version rustls-platform-verifier speaks (its Android module takes this crate's Env).
-jni = { version = "0.22", default-features = false }
-# The JavaVM and the activity, which Android hands to the process.
-ndk-context = "0.1"
-# Android's certificate check for mail's TLS (crates/net/src/tls.rs), set up through `android::init_with_env`.
-rustls-platform-verifier = { workspace = true }

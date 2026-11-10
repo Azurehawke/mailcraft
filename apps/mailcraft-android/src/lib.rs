@@ -8,8 +8,8 @@
 //! drives it. What differs here:
 //! - The settings, the mailbox and its content live in the app's private data folder.
 //! - Mail is sent and received through `mailcraft-net` on background threads, as on the desktop.
-//! - TLS certificates are checked by Android's own verifier, set up through JNI before any
-//!   connection is made ([`init_tls`]).
+//! - TLS certificates are checked against Mozilla's public roots bundled in the app, not Android's
+//!   own store (see `mailcraft-net`'s `tls`): that store refused the Let's Encrypt chains here.
 //! - Not in this first build: the file pickers, the built-in updater, printing, the control
 //!   channel, and the soft keyboard for typed text. (Sign-in and certificate trust are shared with
 //!   the desktop's window and have not been tried on a device yet.)
@@ -95,28 +95,6 @@ fn sync_in_background(request: SyncRequest, ctx: egui::Context) -> Receiver<Sync
     rx
 }
 
-/// Sets up Android's certificate check, which `mailcraft-net` uses for every secure connection.
-/// The verifier needs the app's JavaVM and its activity, which the activity hands over; this runs
-/// once, before the window starts. Without it every secure connection is refused and says why.
-fn init_tls() -> Result<(), String> {
-    let context = ndk_context::android_context();
-    // SAFETY: the VM and the activity belong to this process, and Android keeps both for as long
-    // as the app runs. Attaching the thread that calls in is what the JNI requires of it.
-    if context.vm().is_null() || context.context().is_null() {
-        return Err("Android hasn't given the app its activity yet".into());
-    }
-    // (`from_raw` asserts a non-null pointer, which the check above rules out.)
-    #[allow(unsafe_code)]
-    let vm = unsafe { jni::JavaVM::from_raw(context.vm().cast()) };
-    vm.attach_current_thread(|env| {
-        // SAFETY: as above; the activity is a local reference for this call only.
-        #[allow(unsafe_code)]
-        let activity = unsafe { jni::objects::JObject::from_raw(env, context.context().cast()) };
-        rustls_platform_verifier::android::init_with_env(env, activity)
-    })
-    .map_err(|e| e.to_string())
-}
-
 /// The window's app: the desktop's `MailApp`, driven as the desktop's `App` drives it.
 struct MobileApp(MailApp);
 
@@ -164,9 +142,6 @@ fn android_main(android: AndroidApp) {
             std::env::set_var("TMPDIR", &tmp);
         }
         log::info!("MailCraft {} data folder {}", env!("CARGO_PKG_VERSION"), dir.display());
-    }
-    if let Err(e) = init_tls() {
-        log::error!("the system's certificate check couldn't be set up: {e}");
     }
 
     let options = eframe::NativeOptions { android_app: Some(android), renderer: eframe::Renderer::Wgpu, ..Default::default() };
