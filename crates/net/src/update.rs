@@ -45,6 +45,63 @@ const MAX_ANSWER: usize = 512 * 1024;
 const MAX_NAME: usize = 100;
 /// Most files of a release looked at (0.4.2 had 21).
 const MAX_ASSETS: usize = 200;
+/// Most releases looked at in the list for an Android build (one is published per build).
+const MAX_RELEASES: usize = 30;
+
+/// A newer build of the Android app: the release `android-<number>` the Android workflow
+/// publishes for each build of its repository.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AndroidBuild {
+    /// The build number (the workflow's run number).
+    pub number: u64,
+    /// The address of that release's page on `github.com`.
+    pub page: String,
+}
+
+/// The newest Android build published in this build's repository, when it is newer than
+/// `after` (the number of the build asking). One request for the release list, as [`latest`]
+/// makes; nothing of the asker goes with it. Blocks for ten seconds at most.
+pub fn newer_android_build(after: u64) -> Result<Option<AndroidBuild>, NetError> {
+    let (owner, repo) = owner_and_repo(REPOSITORY).ok_or_else(|| said("this build names no repository on GitHub"))?;
+    let url =
+        Url::parse(&format!("{API}/repos/{owner}/{repo}/releases?per_page={MAX_RELEASES}")).map_err(|_| said("the address to ask isn't one"))?;
+    let headers = [("Accept", "application/vnd.github+json")];
+    let reply = http::request(&url, &Request { method: "GET", headers: &headers, body: None, patience: PATIENCE, max_body: MAX_ANSWER })
+        .map_err(|e| without_address(&e))?;
+    match reply.status {
+        200 => android_build(&reply.body, owner, repo, after),
+        403 | 429 => Err(said("GitHub asked to be asked later")),
+        status => Err(said(&format!("GitHub answered {status}"))),
+    }
+}
+
+/// The newest `android-<number>` release in GitHub's list, when its number is above `after`.
+fn android_build(body: &[u8], owner: &str, repo: &str, after: u64) -> Result<Option<AndroidBuild>, NetError> {
+    let junk = || said("GitHub's answer wasn't one");
+    let json: Value = serde_json::from_slice(body).map_err(|_| junk())?;
+    let list = json.as_array().ok_or_else(junk)?;
+    let mut newest: Option<AndroidBuild> = None;
+    for release in list.iter().take(MAX_RELEASES) {
+        if release.get("draft").and_then(Value::as_bool).unwrap_or(false) {
+            continue;
+        }
+        let Some(tag) = release.get("tag_name").and_then(Value::as_str) else { continue };
+        let Some(number) =
+            tag.strip_prefix("android-").filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())).and_then(|n| n.parse::<u64>().ok())
+        else {
+            continue;
+        };
+        if newest.as_ref().is_some_and(|b| b.number >= number) {
+            continue;
+        }
+        // The tag holds only digits, so it can't carry the address anywhere else.
+        let made = format!("https://github.com/{owner}/{repo}/releases/tag/{tag}");
+        let given = release.get("html_url").and_then(Value::as_str).unwrap_or_default();
+        let page = if is_release_page(given, owner, repo, tag) { given.to_string() } else { made };
+        newest = Some(AndroidBuild { number, page });
+    }
+    Ok(newest.filter(|b| b.number > after))
+}
 
 /// The newest release of this build's repository, when GitHub says there is one that this
 /// build could run. `pre_releases`: the running build is a pre-release itself, so one is not

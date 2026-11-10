@@ -64,6 +64,8 @@ jobs:
       - name: Build the APK
         env:
           VERSION_CODE: ${{ github.run_number }}
+          # The app compares this with the builds published below, to say when one is out.
+          MAILCRAFT_ANDROID_BUILD: ${{ github.run_number }}
         run: |
           set -o pipefail
           bash packaging/android/build-apk.sh 2>&1 | tee "$RUNNER_TEMP/build.log"
@@ -92,8 +94,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Each build keeps its own release, numbered by the run, which the app looks for when it
+          # starts (`android-<number>`). android-latest is kept pointing at the newest for the link.
+          gh release create "android-${{ github.run_number }}" target/android-apk/mailcraft.apk \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "MailCraft for Android (build ${{ github.run_number }})" \
+            --notes "Built from ${GITHUB_SHA::7} on the android branch. Install mailcraft.apk on the tablet."
           gh release delete android-latest --yes --cleanup-tag || true
           gh release create android-latest target/android-apk/mailcraft.apk \
             --prerelease --target "$GITHUB_SHA" \
             --title "MailCraft for Android (build ${{ github.run_number }})" \
-            --notes "Built from ${GITHUB_SHA::7} on the android branch. Install mailcraft.apk on the tablet. This first build is mail only."
+            --notes "Built from ${GITHUB_SHA::7} on the android branch. Install mailcraft.apk on the tablet."

@@ -26,6 +26,7 @@ use mailcraft_engine::Session;
 use mailcraft_engine::io::BackgroundSave;
 use mailcraft_model::Mailbox;
 use mailcraft_model::sync::{SyncRequest, SyncResult};
+use mailcraft_net::update::AndroidBuild;
 use mailcraft_ui_egui::{MailApp, Services};
 use winit::platform::android::activity::AndroidApp;
 
@@ -103,6 +104,68 @@ struct MobileApp {
     status_bar_px: i32,
     /// The system bars' insets last applied, in points.
     insets: egui::epaint::MarginF32,
+    /// The answer to this launch's check, until it comes.
+    build_check: Option<Receiver<Option<AndroidBuild>>>,
+    /// A newer build that the check found.
+    newer: Option<AndroidBuild>,
+}
+
+/// This APK's build number, from the workflow's run number when it was built (`0` otherwise).
+fn this_build() -> u64 {
+    option_env!("MAILCRAFT_ANDROID_BUILD").and_then(|n| n.parse().ok()).unwrap_or(0)
+}
+
+/// Asks, on a thread of its own, whether a newer build is published; the answer comes back on
+/// the channel, `None` when there is none or the question failed.
+fn check_for_build(build: u64) -> Receiver<Option<AndroidBuild>> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let found = mailcraft_net::update::newer_android_build(build).ok().flatten();
+        // The window may have closed by now; nobody is then waiting for the answer.
+        let _ = tx.send(found);
+    });
+    rx
+}
+
+/// Opens `url` in the system's browser (an intent to view it), from the activity.
+#[allow(unsafe_code)] // The JavaVM and activity pointers android-activity gives, valid while the app runs.
+fn open_page(android: &AndroidApp, url: &str) -> Result<(), String> {
+    let vm_ptr = android.vm_as_ptr() as *mut jni::sys::JavaVM;
+    let activity_ptr = android.activity_as_ptr() as jni::sys::jobject;
+    if vm_ptr.is_null() || activity_ptr.is_null() {
+        return Err("the activity isn't there".to_string());
+    }
+    // SAFETY: both pointers come from android-activity and stay valid for as long as the app runs.
+    let vm = unsafe { jni::JavaVM::from_raw(vm_ptr) };
+    vm.attach_current_thread(|env| -> jni::errors::Result<()> {
+        // SAFETY: the activity is a live local reference for this call, on this thread.
+        let activity = unsafe { jni::objects::JObject::from_raw(env, activity_ptr) };
+        let text = env.new_string(url)?;
+        let uri_class = env.find_class(jni::jni_str!("android/net/Uri"))?;
+        let uri = env
+            .call_static_method(
+                &uri_class,
+                jni::jni_str!("parse"),
+                jni::jni_sig!((java.lang.String) -> android.net.Uri),
+                &[jni::objects::JValue::Object(&text)],
+            )?
+            .l()?;
+        let action = env.new_string("android.intent.action.VIEW")?;
+        let intent_class = env.find_class(jni::jni_str!("android/content/Intent"))?;
+        let intent = env.new_object(
+            &intent_class,
+            jni::jni_sig!((java.lang.String, android.net.Uri) -> void),
+            &[jni::objects::JValue::Object(&action), jni::objects::JValue::Object(&uri)],
+        )?;
+        env.call_method(
+            &activity,
+            jni::jni_str!("startActivity"),
+            jni::jni_sig!((android.content.Intent) -> void),
+            &[jni::objects::JValue::Object(&intent)],
+        )?;
+        Ok(())
+    })
+    .map_err(|e| format!("{e}"))
 }
 
 /// The status bar's height in physical pixels, asked of Android's own resources (the
@@ -179,6 +242,16 @@ impl eframe::App for MobileApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if let Some(rx) = &self.build_check {
+            match rx.try_recv() {
+                Ok(found) => {
+                    self.newer = found;
+                    self.build_check = None;
+                }
+                Err(mpsc::TryRecvError::Disconnected) => self.build_check = None,
+                Err(mpsc::TryRecvError::Empty) => {}
+            }
+        }
         // The window's whole layout goes inside the area the system bars leave free. egui's own
         // safe area isn't relied on: Android 16 draws under the bars and the root layout ignores it.
         let i = self.insets;
@@ -187,6 +260,22 @@ impl eframe::App for MobileApp {
         rect.min.y += i.top;
         rect.max.x -= i.right;
         rect.max.y -= i.bottom;
+        if let Some(newer) = self.newer.clone() {
+            // A strip across the top says a newer build is out, and opens its page.
+            let strip = egui::Rect::from_min_size(rect.min, egui::vec2(rect.width(), 48.0));
+            rect.min.y += 48.0;
+            let android = &self.android;
+            ui.scope_builder(egui::UiBuilder::new().max_rect(strip), |ui| {
+                ui.horizontal_centered(|ui| {
+                    ui.label(format!("A newer MailCraft for Android is out (build {}).", newer.number));
+                    if ui.button("Open the download page").clicked() {
+                        if let Err(e) = open_page(android, &newer.page) {
+                            log::error!("the download page didn't open: {e}");
+                        }
+                    }
+                });
+            });
+        }
         if rect.is_positive() {
             ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| self.app.ui(ui));
         } else {
@@ -256,7 +345,10 @@ fn android_main(android: AndroidApp) {
             app.autosave = path.is_some();
             let status_bar_px = status_bar_height_px(&for_insets);
             log::info!("status bar height (pixels): {status_bar_px}");
-            Ok(Box::new(MobileApp { app, android: for_insets, status_bar_px, insets: egui::epaint::MarginF32::default() }))
+            // Every launch asks whether a newer build is out, unless this build was made by hand.
+            let build = this_build();
+            let build_check = (build > 0).then(|| check_for_build(build));
+            Ok(Box::new(MobileApp { app, android: for_insets, status_bar_px, insets: egui::epaint::MarginF32::default(), build_check, newer: None }))
         }),
     );
     if let Err(e) = result {
