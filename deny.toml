@@ -84,4 +84,4 @@ wildcards = "allow"
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = ["https://github.com/UCS-Care-Group/winit"]
+allow-git = ["https://github.com/UCS-Care-Group/winit", "https://github.com/Azurehawke/winit"]
