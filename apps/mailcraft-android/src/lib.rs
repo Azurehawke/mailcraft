@@ -96,23 +96,63 @@ fn sync_in_background(request: SyncRequest, ctx: egui::Context) -> Receiver<Sync
 }
 
 /// The window's app: the desktop's `MailApp`, driven as the desktop's `App` drives it.
-struct MobileApp(MailApp);
+struct MobileApp {
+    app: MailApp,
+    android: AndroidApp,
+    /// The system bars' insets last applied, in points.
+    insets: egui::epaint::MarginF32,
+}
+
+impl MobileApp {
+    /// The window's edges covered by system bars, in points, from Android's content rect (the
+    /// part of the window the bars leave free). NativeActivity draws under the status bar on
+    /// Android 16 (One UI 8.5 forces edge-to-edge), so the window is laid out inside this area.
+    fn system_bar_insets(&self, ctx: &egui::Context, raw: &egui::RawInput) -> Option<egui::epaint::MarginF32> {
+        let ppp = ctx.pixels_per_point();
+        let screen = raw.screen_rect?;
+        if !(ppp.is_finite() && ppp > 0.0) {
+            return None;
+        }
+        let r = self.android.content_rect();
+        if r.right <= r.left || r.bottom <= r.top {
+            return None;
+        }
+        let (w, h) = (screen.width() * ppp, screen.height() * ppp);
+        let inset = |px: f32| (px / ppp).clamp(0.0, 400.0);
+        Some(egui::epaint::MarginF32 {
+            left: inset(r.left as f32),
+            top: inset(r.top as f32),
+            right: inset(w - r.right as f32),
+            bottom: inset(h - r.bottom as f32),
+        })
+    }
+}
 
 impl eframe::App for MobileApp {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        if let Some(insets) = self.system_bar_insets(ctx, raw) {
+            if insets != self.insets {
+                log::info!("system bar insets (points): {insets:?}");
+            }
+            self.insets = insets;
+            raw.safe_area_insets = Some(egui::SafeAreaInsets(insets));
+        }
+    }
+
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.0.logic(ctx);
+        self.app.logic(ctx);
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        self.0.ui(ui);
+        self.app.ui(ui);
     }
 
     fn on_exit(&mut self) {
         // A window closed while its mailbox was still opening has nothing to save.
-        if self.0.is_opening() {
+        if self.app.is_opening() {
             return;
         }
-        if let Err(e) = self.0.save_on_exit() {
+        if let Err(e) = self.app.save_on_exit() {
             log::error!("mailbox not saved on exit: {e}");
         }
     }
@@ -144,11 +184,13 @@ fn android_main(android: AndroidApp) {
         log::info!("MailCraft {} data folder {}", env!("CARGO_PKG_VERSION"), dir.display());
     }
 
+    // The window reads the system bars' insets from this handle, every frame.
+    let for_insets = android.clone();
     let options = eframe::NativeOptions { android_app: Some(android), renderer: eframe::Renderer::Wgpu, ..Default::default() };
     let result = eframe::run_native(
         "MailCraft",
         options,
-        Box::new(|cc| {
+        Box::new(move |cc| {
             let path = mailbox_path();
             let (mailbox, path) = open_mailbox(path);
             let mut session = Session::new(mailbox);
@@ -165,7 +207,7 @@ fn android_main(android: AndroidApp) {
             }
             let mut app = MailApp::new(session, services);
             app.autosave = path.is_some();
-            Ok(Box::new(MobileApp(app)))
+            Ok(Box::new(MobileApp { app, android: for_insets, insets: egui::epaint::MarginF32::default() }))
         }),
     );
     if let Err(e) = result {
