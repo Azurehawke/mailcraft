@@ -30,7 +30,10 @@ fn platform_verifier(provider: Arc<CryptoProvider>) -> Result<Arc<dyn ServerCert
     use rustls::RootCertStore;
     use rustls::client::WebPkiServerVerifier;
     let mut roots = RootCertStore::empty();
-    roots.extend(webpki_root_certs::TLS_SERVER_ROOT_CERTS.iter().cloned());
+    for certificate in webpki_root_certs::TLS_SERVER_ROOT_CERTS {
+        // A root that doesn't parse is left out; the others still anchor the chains they sign.
+        let _ = roots.add(certificate.clone());
+    }
     let verifier: Arc<dyn ServerCertVerifier> = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider)
         .build()
         .map_err(|e| format!("the certificate check couldn't be set up ({e})"))?;
