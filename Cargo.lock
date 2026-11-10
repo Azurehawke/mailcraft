@@ -1673,7 +1673,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "dpi"
 version = "0.1.1"
-source = "git+https://github.com/Azurehawke/winit?rev=1cc349b72c893b3acb5a0754444902d0eb5d81d5#1cc349b72c893b3acb5a0754444902d0eb5d81d5"
+source = "git+https://github.com/Azurehawke/winit?rev=28dee15c6923aeae45c507bebdba1c3c15a02a0b#28dee15c6923aeae45c507bebdba1c3c15a02a0b"
 
 [[package]]
 name = "dpi"
@@ -7098,7 +7098,7 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 [[package]]
 name = "winit"
 version = "0.30.13"
-source = "git+https://github.com/Azurehawke/winit?rev=1cc349b72c893b3acb5a0754444902d0eb5d81d5#1cc349b72c893b3acb5a0754444902d0eb5d81d5"
+source = "git+https://github.com/Azurehawke/winit?rev=28dee15c6923aeae45c507bebdba1c3c15a02a0b#28dee15c6923aeae45c507bebdba1c3c15a02a0b"
 dependencies = [
  "ahash",
  "android-activity",
