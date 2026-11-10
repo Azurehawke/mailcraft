@@ -87,6 +87,7 @@ impl SecretStore for AndroidSecrets {
 }
 
 /// Runs `f` with the JNI environment of this thread, attached to the Java VM.
+#[allow(unsafe_code)] // The JavaVM pointer android-activity gives, valid while the app runs.
 fn with_env<T>(android: &AndroidApp, f: impl FnOnce(&mut Env<'_>) -> jni::errors::Result<T>) -> Result<T, String> {
     let vm_ptr = android.vm_as_ptr() as *mut jni::sys::JavaVM;
     if vm_ptr.is_null() {
@@ -168,7 +169,7 @@ fn make_key(env: &mut Env<'_>, alias: &JObject<'_>) -> jni::errors::Result<()> {
 fn one_string<'l>(env: &mut Env<'l>, text: &str) -> jni::errors::Result<JObject<'l>> {
     let array = env.new_object_array(1, jni_str!("java/lang/String"), JObject::null())?;
     let value = env.new_string(text)?;
-    env.set_object_array_element(&array, 0, &value)?;
+    array.set_element(env, 0, &value)?;
     Ok(array.into())
 }
 
@@ -186,10 +187,12 @@ fn seal(env: &mut Env<'_>, plain: &[u8]) -> jni::errors::Result<Vec<u8>> {
         )?
         .l()?;
     env.call_method(&cipher, jni_str!("init"), jni_sig!("(ILjava/security/Key;)V"), &[JValue::Int(ENCRYPT_MODE), JValue::Object(&key)])?;
-    let iv = JByteArray::from(env.call_method(&cipher, jni_str!("getIV"), jni_sig!("()[B"), &[])?.l()?);
+    let iv_obj = env.call_method(&cipher, jni_str!("getIV"), jni_sig!("()[B"), &[])?.l()?;
+    let iv = JByteArray::cast_local(env, iv_obj)?;
     let iv = env.convert_byte_array(&iv)?;
     let data = env.byte_array_from_slice(plain)?;
-    let sealed = JByteArray::from(env.call_method(&cipher, jni_str!("doFinal"), jni_sig!("([B)[B"), &[JValue::Object(&data)])?.l()?);
+    let sealed_obj = env.call_method(&cipher, jni_str!("doFinal"), jni_sig!("([B)[B"), &[JValue::Object(&data)])?.l()?;
+    let sealed = JByteArray::cast_local(env, sealed_obj)?;
     let sealed = env.convert_byte_array(&sealed)?;
     let mut out = Vec::with_capacity(1 + iv.len() + sealed.len());
     out.push(u8::try_from(iv.len()).unwrap_or(0));
@@ -229,6 +232,7 @@ fn open(env: &mut Env<'_>, iv: &[u8], body: &[u8]) -> jni::errors::Result<Vec<u8
         &[JValue::Int(DECRYPT_MODE), JValue::Object(&key), JValue::Object(&spec)],
     )?;
     let data = env.byte_array_from_slice(body)?;
-    let plain = JByteArray::from(env.call_method(&cipher, jni_str!("doFinal"), jni_sig!("([B)[B"), &[JValue::Object(&data)])?.l()?);
+    let plain_obj = env.call_method(&cipher, jni_str!("doFinal"), jni_sig!("([B)[B"), &[JValue::Object(&data)])?.l()?;
+    let plain = JByteArray::cast_local(env, plain_obj)?;
     env.convert_byte_array(&plain)
 }
