@@ -27,6 +27,9 @@ use mailcraft_engine::io::BackgroundSave;
 use mailcraft_model::Mailbox;
 use mailcraft_model::sync::{SyncRequest, SyncResult};
 use mailcraft_net::update::AndroidBuild;
+use std::sync::Arc;
+
+mod secrets;
 use mailcraft_ui_egui::{MailApp, Services};
 use winit::platform::android::activity::AndroidApp;
 
@@ -322,6 +325,8 @@ fn android_main(android: AndroidApp) {
 
     // The window reads the system bars' insets from this handle, every frame.
     let for_insets = android.clone();
+    let for_secrets = android.clone();
+    let secrets_dir = android.internal_data_path().map(|dir| dir.join("secrets"));
     let options = eframe::NativeOptions { android_app: Some(android), renderer: eframe::Renderer::Wgpu, ..Default::default() };
     let result = eframe::run_native(
         "MailCraft",
@@ -340,6 +345,10 @@ fn android_main(android: AndroidApp) {
             };
             if let Some(p) = &path {
                 services.saver = background_saver(&cc.egui_ctx, p);
+            }
+            // Remembered sign-ins are sealed with the Keystore, in the app's own folder.
+            if let Some(dir) = &secrets_dir {
+                services.secrets = Some(Arc::new(secrets::AndroidSecrets::new(for_secrets.clone(), dir.clone())));
             }
             let mut app = MailApp::new(session, services);
             app.autosave = path.is_some();
