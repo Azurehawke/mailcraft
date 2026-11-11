@@ -1,0 +1,33 @@
+== libmailcraft_android.so
+warning: Environment variable `ANDROID_NDK_HOME = "/usr/local/lib/android/sdk/ndk/30.0.16248370"` doesn't match `ANDROID_NDK_ROOT = "/usr/local/lib/android/sdk/ndk/27.3.13750724"`
+    Building arm64-v8a (aarch64-linux-android)
+[1m[92m    Updating[0m git repository `https://github.com/Azurehawke/winit`
+[1m[92m   Compiling[0m mailcraft-charset v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/charset)
+[1m[92m   Compiling[0m mailcraft-names v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/names)
+[1m[92m   Compiling[0m mailcraft-i18n v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/i18n)
+[1m[92m   Compiling[0m mailcraft-time v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/time)
+[1m[92m   Compiling[0m mailcraft-link v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/link)
+[1m[92m   Compiling[0m winit v0.30.13 (https://github.com/Azurehawke/winit?rev=c941811bb32a8beec1cd9c450781c18d681714f3#c941811b)
+[1m[92m   Compiling[0m mailcraft-html v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/html)
+[1m[92m   Compiling[0m dpi v0.1.1 (https://github.com/Azurehawke/winit?rev=c941811bb32a8beec1cd9c450781c18d681714f3#c941811b)
+[1m[92m   Compiling[0m mailcraft-ui-egui v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/ui-egui)
+[1m[92m   Compiling[0m mailcraft-pst v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/pst)
+[1m[92m   Compiling[0m mailcraft-model v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/model)
+[1m[92m   Compiling[0m egui-winit v0.37.0
+[1m[92m   Compiling[0m egui-wgpu v0.37.0
+[1m[92m   Compiling[0m mailcraft-proto v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/proto)
+[1m[92m   Compiling[0m eframe v0.37.0
+[1m[92m   Compiling[0m mailcraft-control-key v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/control-key)
+[1m[92m   Compiling[0m mailcraft-mime v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/mime)
+[1m[92m   Compiling[0m mailcraft-smime v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/smime)
+[1m[92m   Compiling[0m mailcraft-vcard v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/vcard)
+[1m[92m   Compiling[0m mailcraft-ical v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/ical)
+[1m[92m   Compiling[0m mailcraft-engine v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/engine)
+[1m[92m   Compiling[0m mailcraft-net v0.11.2 (/home/runner/work/mailcraft/mailcraft/crates/net)
+[1m[92m   Compiling[0m mailcraft-android v0.11.2 (/home/runner/work/mailcraft/mailcraft/apps/mailcraft-android)
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 3m 08s
+     Copying libraries to /home/runner/work/mailcraft/mailcraft/target/android-apk/jniLibs
+== resources and manifest
+== native library
+== align and sign
+-rw-r--r-- 1 runner runner 18629144 Nov 11 05:33 /home/runner/work/mailcraft/mailcraft/target/android-apk/mailcraft.apk
