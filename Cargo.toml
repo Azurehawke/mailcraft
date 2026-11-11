@@ -171,4 +171,4 @@ debug = 0
 # names the latest click, which KWin needs before it brings the browser forward (#144); and
 # Wayland file drops plus the clipboard on winit's one data device (rust-windowing/winit#4729),
 # so that files dropped on a window are attached (#523).
-winit = { git = "https://github.com/Azurehawke/winit", rev = "2f9897897ffed4edc644d34cf64d61ab17a87ed3" }
+winit = { git = "https://github.com/Azurehawke/winit", rev = "c941811bb32a8beec1cd9c450781c18d681714f3" }
