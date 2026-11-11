@@ -29,6 +29,7 @@ use mailcraft_model::sync::{SyncRequest, SyncResult};
 use mailcraft_net::update::AndroidBuild;
 use std::sync::Arc;
 
+mod pictures;
 mod secrets;
 use mailcraft_ui_egui::{MailApp, Services};
 use winit::platform::android::activity::AndroidApp;
@@ -327,6 +328,7 @@ fn android_main(android: AndroidApp) {
     let for_insets = android.clone();
     let for_secrets = android.clone();
     let secrets_dir = android.internal_data_path().map(|dir| dir.join("secrets"));
+    let pictures_dir = android.internal_data_path().map(|dir| dir.join("pictures"));
     let options = eframe::NativeOptions { android_app: Some(android), renderer: eframe::Renderer::Wgpu, ..Default::default() };
     let result = eframe::run_native(
         "MailCraft",
@@ -347,6 +349,16 @@ fn android_main(android: AndroidApp) {
                 services.saver = background_saver(&cc.egui_ctx, p);
             }
             // Remembered sign-ins are sealed with the Keystore, in the app's own folder.
+            // Pictures a message's owner asked for come from the web, and are kept in the app's folder.
+            if let Some(dir) = &pictures_dir {
+                let cache = Arc::new(pictures::Pictures::new(dir.clone()));
+                let ctx = cc.egui_ctx.clone();
+                services.pictures = Some(Box::new({
+                    let cache = cache.clone();
+                    move |url| pictures::download(cache.clone(), url, ctx.clone())
+                }));
+                services.picture_cache = Some(Box::new(pictures::Kept(cache)));
+            }
             if let Some(dir) = &secrets_dir {
                 services.secrets = Some(Arc::new(secrets::AndroidSecrets::new(for_secrets.clone(), dir.clone())));
             }
